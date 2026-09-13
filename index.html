@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>AR Shooter Stage 3</title>
+<title>AR Shooter Stage 4 - iPhone Compatible</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,sans-serif;touch-action:none}
@@ -30,8 +30,10 @@ color:#fff;font-size:34px;font-weight:900;opacity:0;pointer-events:none;text-sha
 @keyframes hit{0%{opacity:1;transform:translate(-50%,-50%) scale(.7)}
 100%{opacity:0;transform:translate(-50%,-50%) scale(1.25)}}
 #menu{position:fixed;z-index:100;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;padding:25px}
-#menu .box{max-width:480px}
+#menu .box{max-width:520px}
 #start{padding:14px 22px;border-radius:13px;font-size:17px}
+#camera{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;background:#000}
+#ios-note{font-size:13px;line-height:1.5;color:#ffeb3b}
 @media (orientation:portrait){#menu .box:after{content:"\A横向きでのプレイをおすすめします";white-space:pre;color:#ffeb3b;font-weight:800}}
 </style>
 </head>
@@ -49,11 +51,13 @@ color:#fff;font-size:34px;font-weight:900;opacity:0;pointer-events:none;text-sha
 <button id="shoot">SHOOT</button>
 <div id="hit">HIT!</div>
 
+<video id="camera" autoplay playsinline muted></video>
 <div id="menu">
  <div class="box">
   <h1>AR SHOOTER</h1>
-  <p id="message">第3段階：現実の地面に敵を配置します。</p>
-  <p>① スマホを横向きにする<br>② カメラを地面に向けてゆっくり動かす<br>③ 白い円が出たら地面をタップ<br>④ 敵を探してSHOOT！</p>
+  <p id="message">第4段階：Androidは本格AR、iPhoneはカメラARモードでプレイできます。</p>
+  <p>Android：地面を検出して敵を配置<br>iPhone：背面カメラを表示して敵を配置・射撃</p>
+  <p id="ios-note">※ iPhoneのSafariでは現時点で「immersive-ar」が公式対応していないため、iPhoneモードはカメラ映像＋3D表示による互換モードです。</p>
   <button id="start">ARゲームを開始</button>
  </div>
 </div>
@@ -65,7 +69,8 @@ let scene,camera,renderer,session;
 let targets=[];
 let score=0,hp=100,ammo=12,combo=0,timeLeft=60;
 let running=false,reloading=false;
-let hitSource=null,hitSourceRequested=false,reticle3D=null;
+let hitSource=null,hitSourceRequested=false,hitSourceRequesting=false,reticle3D=null;
+let iosMode=false, cameraStream=null, deviceControls=null;
 let clock=new THREE.Clock();
 
 const $=id=>document.getElementById(id);
@@ -116,7 +121,18 @@ function flash(text){
 }
 
 function placeTarget(){
- if(!running || !reticle3D || !reticle3D.visible)return;
+ if(!running)return;
+
+ if(iosMode){
+   const x=(Math.random()-.5)*2.2;
+   const y=(Math.random()-.5)*1.4;
+   const z=-2.3-Math.random()*2.5;
+   createTarget(new THREE.Vector3(x,y,z));
+   status.textContent="敵を追加しました。中央の照準で狙ってSHOOT！";
+   return;
+ }
+
+ if(!reticle3D || !reticle3D.visible)return;
  const p=new THREE.Vector3().setFromMatrixPosition(reticle3D.matrix);
  p.y+=.28;
  createTarget(p);
@@ -153,18 +169,129 @@ function doReload(){
  setTimeout(()=>{ammo=12;ammoEl.textContent=ammo;reloading=false;reload.textContent="RELOAD"},900);
 }
 
-async function startAR(){
- if(!navigator.xr){$("message").textContent="このブラウザはWebXRに対応していません。Androidの対応ブラウザで開いてください。";return}
- if(!(await navigator.xr.isSessionSupported("immersive-ar"))){
-   $("message").textContent="この端末/ブラウザではARが利用できません。WebXR対応のAndroid端末を使用してください。";return
+
+function endGame(reason){
+ if(!running)return;
+ running=false;
+ status.style.display="none";
+ menu.style.display="flex";
+ $("message").innerHTML=`${reason}！<br>スコア：<b>${score}</b>`;
+ $("start").textContent="もう一度プレイ";
+ if(session){try{session.end()}catch(e){}}
+ if(cameraStream){
+   cameraStream.getTracks().forEach(t=>t.stop());
+   cameraStream=null;
  }
+ if(renderer) renderer.setAnimationLoop(null);
+}
+
+async function startIOS(){
+ iosMode=true;
+ init();
+ const video=$("camera");
+
+ try{
+   cameraStream=await navigator.mediaDevices.getUserMedia({
+     video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},
+     audio:false
+   });
+   video.srcObject=cameraStream;
+   await video.play();
+ }catch(e){
+   $("message").textContent="カメラを利用できません。Safariのカメラ許可とHTTPS接続を確認してください。";
+   return;
+ }
+
+ // iOS Safari requires an explicit permission request for motion sensors.
+ try{
+   if(typeof DeviceOrientationEvent!=="undefined" &&
+      typeof DeviceOrientationEvent.requestPermission==="function"){
+     const p=await DeviceOrientationEvent.requestPermission();
+     if(p!=="granted") throw new Error("motion permission denied");
+   }
+ }catch(e){
+   // Camera-only mode still works if motion permission is unavailable.
+ }
+
+ video.style.display="block";
+ menu.style.display="none";
+ status.style.display="block";
+ status.textContent="iPhoneモード：敵を配置して、画面中央で狙ってください";
+ place.style.display="block";
+
+ score=0;hp=100;ammo=12;combo=0;timeLeft=60;
+ scoreEl.textContent=0;hpEl.textContent=100;ammoEl.textContent=12;comboEl.textContent=0;timeEl.textContent=60;
+ running=true;
+
+ // iPhone fallback: targets live in a virtual space in front of the phone.
+ // They can be aimed at with the center crosshair, but are not SLAM-anchored.
+ reticle3D=new THREE.Object3D();
+ reticle3D.position.set(0,0,-2.5);
+ reticle3D.visible=true;
+ scene.add(reticle3D);
+
+ // Create a few initial targets at different virtual positions.
+ for(const p of [[-0.8,0.1,-3],[0.7,0.3,-3.5],[0,-0.4,-2.5]]) {
+   createTarget(new THREE.Vector3(...p));
+ }
+ place.style.display="block";
+ place.textContent="敵を追加";
+
+ const timer=setInterval(()=>{
+   if(!running){clearInterval(timer);return}
+   timeLeft--;timeEl.textContent=timeLeft;
+   if(timeLeft<=0){clearInterval(timer);endGame("時間切れ");}
+ },1000);
+
+ renderer.setAnimationLoop(()=>{
+   const dt=clock.getDelta();
+   for(const target of [...targets]){
+     target.rotation.y+=dt*1.5;
+     target.position.y+=Math.sin(performance.now()*.001+target.userData.phase)*dt*.05;
+     target.userData.life+=dt;
+     if(target.userData.life>12){
+       removeTarget(target);
+       hp=Math.max(0,hp-10); hpEl.textContent=hp;
+       combo=0;comboEl.textContent=combo;
+       if(hp<=0) endGame("ゲームオーバー");
+     }
+   }
+   renderer.render(scene,camera);
+ });
+}
+
+async function startAR(){
+ const ua=navigator.userAgent||"";
+ const isIOS=/iPhone|iPad|iPod/i.test(ua);
+
+ // iPhone/iPad: use camera fallback because official immersive WebXR AR is unavailable.
+ if(isIOS){
+   await startIOS();
+   return;
+ }
+
+ if(!navigator.xr){
+   $("message").textContent="WebXR非対応端末です。iPhone/iPadならカメラ互換モードを利用できます。";
+   return;
+ }
+ if(!(await navigator.xr.isSessionSupported("immersive-ar"))){
+   $("message").textContent="この端末/ブラウザでは本格ARが利用できません。対応AndroidではWebXR ARを利用できます。";
+   return;
+ }
+
  try{if(screen.orientation?.lock)await screen.orientation.lock("landscape")}catch(e){}
  init();
- session=await navigator.xr.requestSession("immersive-ar",{
-   requiredFeatures:["hit-test","local-floor"],
-   optionalFeatures:["dom-overlay"],
-   domOverlay:{root:document.body}
- });
+ try{
+   session=await navigator.xr.requestSession("immersive-ar",{
+     requiredFeatures:["hit-test","local-floor"],
+     optionalFeatures:["dom-overlay"],
+     domOverlay:{root:document.body}
+   });
+ }catch(e){
+   $("message").textContent="ARの開始に失敗しました。カメラ・モーションセンサーの許可を確認してください。";
+   return;
+ }
+
  renderer.xr.setSession(session);
  session.addEventListener("end",()=>{running=false});
  running=true;
@@ -188,23 +315,21 @@ async function startAR(){
  const timer=setInterval(()=>{
    if(!running){clearInterval(timer);return}
    timeLeft--;timeEl.textContent=timeLeft;
-   if(timeLeft<=0){
-     running=false;clearInterval(timer);status.style.display="none";menu.style.display="flex";
-     $("message").innerHTML=`ゲーム終了！<br>スコア：<b>${score}</b>`;
-     $("start").textContent="もう一度プレイ";
-     $("start").onclick=()=>location.reload();
-     session.end();
-   }
+   if(timeLeft<=0){clearInterval(timer);endGame("時間切れ");}
  },1000);
 
  renderer.setAnimationLoop((t,frame)=>{
    if(frame){
-     if(!hitSourceRequested){
+     if(!hitSourceRequested && !hitSourceRequesting){
+       hitSourceRequesting=true;
        session.requestReferenceSpace("viewer").then(space=>
          session.requestHitTestSource({space}).then(src=>{
-           hitSource=src;hitSourceRequested=true;
+           hitSource=src;hitSourceRequested=true;hitSourceRequesting=false;
          })
-       );
+       ).catch(()=>{
+         hitSourceRequesting=false;
+         status.textContent="この端末では床検出を利用できません";
+       });
      }
      if(hitSource&&reticle3D){
        const ref=renderer.xr.getReferenceSpace();
@@ -224,10 +349,16 @@ async function startAR(){
    }
 
    const dt=clock.getDelta();
-   for(const t of targets){
-     t.rotation.y+=dt*1.5;
-     t.position.y+=Math.sin(t*.001+t.userData.phase)*dt*.05;
-     t.userData.life+=dt;
+   for(const target of [...targets]){
+     target.rotation.y+=dt*1.5;
+     target.position.y+=Math.sin(performance.now()*.001+target.userData.phase)*dt*.05;
+     target.userData.life+=dt;
+     if(target.userData.life>12){
+       removeTarget(target);
+       hp=Math.max(0,hp-10); hpEl.textContent=hp;
+       combo=0;comboEl.textContent=combo;
+       if(hp<=0) endGame("ゲームオーバー");
+     }
    }
    renderer.render(scene,camera);
  });
