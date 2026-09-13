@@ -1,32 +1,38 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>AR Shooter</title>
+<title>AR Shooter Stage 3</title>
 <style>
-  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,sans-serif}
-  #hud{position:fixed;z-index:10;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;
-       color:#fff;text-shadow:0 2px 4px #000;font-weight:700;font-size:18px;pointer-events:none}
-  #msg{position:fixed;z-index:20;inset:0;display:flex;align-items:center;justify-content:center;
-       color:#fff;text-align:center;background:rgba(0,0,0,.55);padding:28px;box-sizing:border-box}
-  #panel{max-width:420px}
-  button{border:0;border-radius:14px;padding:14px 20px;font-size:17px;font-weight:700;margin:6px;cursor:pointer}
-  #start{background:#fff;color:#111}
-  #fallback{display:none}
-  #crosshair{position:fixed;z-index:9;left:50%;top:50%;width:32px;height:32px;transform:translate(-50%,-50%);
-             pointer-events:none}
-  #crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 5px #000}
-  #crosshair:before{left:15px;top:0;width:2px;height:32px}
-  #crosshair:after{left:0;top:15px;width:32px;height:2px}
-  #shoot{position:fixed;z-index:15;right:18px;bottom:24px;width:88px;height:88px;border-radius:50%;
-         background:rgba(255,255,255,.85);color:#111;border:4px solid rgba(0,0,0,.35)}
-  #shoot:active{transform:scale(.94)}
-  #reload{position:fixed;z-index:15;left:18px;bottom:28px;width:82px;height:50px;border-radius:12px;background:rgba(255,255,255,.85);color:#111}
-  #hit{position:fixed;z-index:16;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:34px;font-weight:900;opacity:0;pointer-events:none;text-shadow:0 2px 6px #000}
-  #hit.show{animation:hit .28s ease-out}
-  @keyframes hit{0%{opacity:1;transform:translate(-50%,-50%) scale(.7)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.3)}}
-  small{opacity:.85}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,sans-serif;touch-action:none}
+#hud{position:fixed;z-index:20;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;
+color:#fff;text-shadow:0 2px 5px #000;font-weight:800;font-size:18px;pointer-events:none}
+#hud small{font-size:13px}
+#crosshair{position:fixed;z-index:15;left:50%;top:50%;width:34px;height:34px;transform:translate(-50%,-50%);pointer-events:none}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 5px #000}
+#crosshair:before{width:2px;height:34px;left:16px;top:0}
+#crosshair:after{height:2px;width:34px;left:0;top:16px}
+#reticle{position:fixed;z-index:14;left:50%;top:50%;width:58px;height:58px;transform:translate(-50%,-50%);
+border:3px solid #fff;border-radius:50%;display:none;pointer-events:none;box-shadow:0 0 8px #000}
+button{border:0;font-weight:800;cursor:pointer}
+#shoot{position:fixed;z-index:30;right:22px;bottom:22px;width:88px;height:88px;border-radius:50%;
+background:rgba(255,255,255,.88);font-size:15px}
+#reload{position:fixed;z-index:30;left:22px;bottom:36px;width:86px;height:48px;border-radius:12px;background:rgba(255,255,255,.88)}
+#place{position:fixed;z-index:30;left:50%;bottom:22px;transform:translateX(-50%);
+padding:13px 18px;border-radius:12px;background:rgba(255,255,255,.92);display:none}
+#status{position:fixed;z-index:25;left:50%;top:12%;transform:translateX(-50%);
+color:#fff;background:rgba(0,0,0,.6);padding:9px 15px;border-radius:12px;font-weight:700;text-align:center;pointer-events:none}
+#hit{position:fixed;z-index:25;left:50%;top:50%;transform:translate(-50%,-50%);
+color:#fff;font-size:34px;font-weight:900;opacity:0;pointer-events:none;text-shadow:0 2px 6px #000}
+#hit.show{animation:hit .3s ease-out}
+@keyframes hit{0%{opacity:1;transform:translate(-50%,-50%) scale(.7)}
+100%{opacity:0;transform:translate(-50%,-50%) scale(1.25)}}
+#menu{position:fixed;z-index:100;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;padding:25px}
+#menu .box{max-width:480px}
+#start{padding:14px 22px;border-radius:13px;font-size:17px}
+@media (orientation:portrait){#menu .box:after{content:"\A横向きでのプレイをおすすめします";white-space:pre;color:#ffeb3b;font-weight:800}}
 </style>
 </head>
 <body>
@@ -36,219 +42,202 @@
   <span>TIME <b id="time">60</b></span>
 </div>
 <div id="crosshair"></div>
-<button id="reload">RELOAD</button><button id="shoot">SHOOT</button><div id="hit">HIT!</div>
-<div id="msg">
-  <div id="panel">
-    <h1>AR SHOOTER</h1>
-    <p>スマホを周囲に向けてターゲットを探し、中央の照準に合わせてSHOOT！</p>
-    <p><small>※ WebXR対応のAndroidブラウザとHTTPS接続が必要です。</small></p>
-    <button id="start">ARゲームを開始</button>
-    <div id="fallback"></div>
-  </div>
+<div id="reticle"></div>
+<div id="status">地面を探しています…</div>
+<button id="place">地面に敵を配置</button>
+<button id="reload">RELOAD</button>
+<button id="shoot">SHOOT</button>
+<div id="hit">HIT!</div>
+
+<div id="menu">
+ <div class="box">
+  <h1>AR SHOOTER</h1>
+  <p id="message">第3段階：現実の地面に敵を配置します。</p>
+  <p>① スマホを横向きにする<br>② カメラを地面に向けてゆっくり動かす<br>③ 白い円が出たら地面をタップ<br>④ 敵を探してSHOOT！</p>
+  <button id="start">ARゲームを開始</button>
+ </div>
 </div>
 
 <script type="module">
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
-let camera, scene, renderer, xrSession = null;
-let score=0, timeLeft=60, running=false, targets=[];
-let hp=100, ammo=12, combo=0, reloading=false;
-let clock = new THREE.Clock();
-const scoreEl=document.getElementById("score");
-const timeEl=document.getElementById("time");
-const hpEl=document.getElementById("hp");
-const ammoEl=document.getElementById("ammo");
-const comboEl=document.getElementById("combo");
-const hitEl=document.getElementById("hit");
-const reloadBtn=document.getElementById("reload");
-const msg=document.getElementById("msg");
-const start=document.getElementById("start");
-const shoot=document.getElementById("shoot");
+let scene,camera,renderer,session;
+let targets=[];
+let score=0,hp=100,ammo=12,combo=0,timeLeft=60;
+let running=false,reloading=false;
+let hitSource=null,hitSourceRequested=false,reticle3D=null;
+let clock=new THREE.Clock();
 
-function initScene(){
-  scene=new THREE.Scene();
-  camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.01,50);
-  scene.add(camera);
+const $=id=>document.getElementById(id);
+const scoreEl=$("score"),hpEl=$("hp"),ammoEl=$("ammo"),comboEl=$("combo"),timeEl=$("time");
+const menu=$("menu"),status=$("status"),place=$("place"),hit=$("hit"),shoot=$("shoot"),reload=$("reload");
 
-  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.setSize(innerWidth,innerHeight);
-  renderer.xr.enabled=true;
-  document.body.appendChild(renderer.domElement);
-
-  const light=new THREE.HemisphereLight(0xffffff,0x444444,2);
-  scene.add(light);
-
-  window.addEventListener("resize",()=>{
-    camera.aspect=innerWidth/innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth,innerHeight);
-  });
+function init(){
+ scene=new THREE.Scene();
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.01,50);
+ scene.add(camera);
+ renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.xr.enabled=true;
+ document.body.appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x444444,2));
+ addEventListener("resize",()=>{
+   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+   renderer.setSize(innerWidth,innerHeight);
+ });
 }
 
-function makeTarget(){
-  const g=new THREE.Group();
-  const body=new THREE.Mesh(
-    new THREE.SphereGeometry(.15,20,20),
-    new THREE.MeshStandardMaterial({color:0xff3b30,emissive:0x330000,roughness:.35})
-  );
-  const ring=new THREE.Mesh(
-    new THREE.TorusGeometry(.22,.025,8,32),
-    new THREE.MeshBasicMaterial({color:0xffffff})
-  );
-  g.add(body,ring);
-
-  // Place target 2–5 m in front of the camera with random horizontal/vertical offset.
-  const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
-  const up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
-  const dist=2.2+Math.random()*2.3;
-  const x=(Math.random()-.5)*2.2;
-  const y=(Math.random()-.5)*1.5;
-  g.position.copy(camera.position).add(dir.multiplyScalar(dist))
-    .add(right.multiplyScalar(x)).add(up.multiplyScalar(y));
-  g.userData.phase=Math.random()*Math.PI*2;
-  g.userData.life=0;
-  scene.add(g);
-  targets.push(g);
-}
-
-function spawn(){
-  if(targets.length<5) makeTarget();
+function createTarget(pos){
+ const g=new THREE.Group();
+ const body=new THREE.Mesh(
+   new THREE.SphereGeometry(.16,20,20),
+   new THREE.MeshStandardMaterial({color:0xff3b30,emissive:0x330000,roughness:.35})
+ );
+ const ring=new THREE.Mesh(
+   new THREE.TorusGeometry(.23,.025,8,32),
+   new THREE.MeshBasicMaterial({color:0xffffff})
+ );
+ g.add(body,ring);
+ g.position.copy(pos);
+ g.userData.life=0;
+ g.userData.phase=Math.random()*Math.PI*2;
+ scene.add(g); targets.push(g);
 }
 
 function removeTarget(t){
-  scene.remove(t);
-  const i=targets.indexOf(t);
-  if(i>=0) targets.splice(i,1);
+ scene.remove(t);
+ const i=targets.indexOf(t);
+ if(i>=0) targets.splice(i,1);
 }
 
-function showHit(text){
-  hitEl.textContent=text;
-  hitEl.classList.remove("show");
-  void hitEl.offsetWidth;
-  hitEl.classList.add("show");
+function flash(text){
+ hit.textContent=text; hit.classList.remove("show"); void hit.offsetWidth; hit.classList.add("show");
+}
+
+function placeTarget(){
+ if(!running || !reticle3D || !reticle3D.visible)return;
+ const p=new THREE.Vector3().setFromMatrixPosition(reticle3D.matrix);
+ p.y+=.28;
+ createTarget(p);
+ place.style.display="none";
+ status.textContent="敵を配置しました。スマホを動かして敵を探してください";
 }
 
 function shootTarget(){
-  if(!running || reloading) return;
-  if(ammo<=0){ showHit("RELOAD!"); return; }
-  ammo--;
-  ammoEl.textContent=ammo;
-  const raycaster=new THREE.Raycaster();
-  raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
-  const hits=raycaster.intersectObjects(targets,true);
-  if(hits.length){
-    let t=hits[0].object;
-    while(t.parent && !targets.includes(t)) t=t.parent;
-    if(targets.includes(t)){
-      combo++;
-      const points=100+Math.min(combo-1,9)*25;
-      score+=points;
-      scoreEl.textContent=score;
-      comboEl.textContent=combo;
-      showHit("HIT! +"+points);
-      removeTarget(t);
-      makeTarget();
-    }
-  } else {
-    combo=0;
-    comboEl.textContent=combo;
-  }
+ if(!running||reloading)return;
+ if(ammo<=0){flash("RELOAD!");return}
+ ammo--;ammoEl.textContent=ammo;
+ const ray=new THREE.Raycaster();
+ ray.setFromCamera(new THREE.Vector2(0,0),camera);
+ const hits=ray.intersectObjects(targets,true);
+ if(hits.length){
+   let t=hits[0].object;
+   while(t.parent&&!targets.includes(t))t=t.parent;
+   if(targets.includes(t)){
+     combo++;
+     const pts=100+Math.min(combo-1,9)*25;
+     score+=pts;scoreEl.textContent=score;comboEl.textContent=combo;
+     flash("HIT! +"+pts);removeTarget(t);
+     if(targets.length<3) status.textContent="地面をタップして次の敵を配置";
+     place.style.display="block";
+   }
+ }else{
+   combo=0;comboEl.textContent=combo;
+ }
 }
 
-function reload(){
-  if(!running || reloading || ammo===12) return;
-  reloading=true;
-  reloadBtn.textContent="...";
-  setTimeout(()=>{
-    ammo=12; ammoEl.textContent=ammo;
-    reloading=false; reloadBtn.textContent="RELOAD";
-  },900);
+function doReload(){
+ if(!running||reloading||ammo===12)return;
+ reloading=true;reload.textContent="...";
+ setTimeout(()=>{ammo=12;ammoEl.textContent=ammo;reloading=false;reload.textContent="RELOAD"},900);
 }
 
 async function startAR(){
-  if(!navigator.xr){
-    document.getElementById("fallback").style.display="block";
-    document.getElementById("fallback").innerHTML=
-      "このブラウザではWebXR ARが利用できません。AndroidのChrome等、WebXR対応ブラウザでHTTPSページを開いてください。";
-    return;
-  }
-  const ok=await navigator.xr.isSessionSupported("immersive-ar");
-  if(!ok){
-    document.getElementById("fallback").style.display="block";
-    document.getElementById("fallback").innerHTML="この端末/ブラウザはARモードに対応していません。";
-    return;
-  }
+ if(!navigator.xr){$("message").textContent="このブラウザはWebXRに対応していません。Androidの対応ブラウザで開いてください。";return}
+ if(!(await navigator.xr.isSessionSupported("immersive-ar"))){
+   $("message").textContent="この端末/ブラウザではARが利用できません。WebXR対応のAndroid端末を使用してください。";return
+ }
+ try{if(screen.orientation?.lock)await screen.orientation.lock("landscape")}catch(e){}
+ init();
+ session=await navigator.xr.requestSession("immersive-ar",{
+   requiredFeatures:["hit-test","local-floor"],
+   optionalFeatures:["dom-overlay"],
+   domOverlay:{root:document.body}
+ });
+ renderer.xr.setSession(session);
+ session.addEventListener("end",()=>{running=false});
+ running=true;
+ menu.style.display="none";
+ status.style.display="block";
+ place.style.display="none";
+ score=0;hp=100;ammo=12;combo=0;timeLeft=60;
+ scoreEl.textContent=0;hpEl.textContent=100;ammoEl.textContent=12;comboEl.textContent=0;timeEl.textContent=60;
 
-  initScene();
-  xrSession=await navigator.xr.requestSession("immersive-ar",{
-    requiredFeatures:["local-floor"],
-    optionalFeatures:["dom-overlay"],
-    domOverlay:{root:document.body}
-  });
-  renderer.xr.setSession(xrSession);
-  xrSession.addEventListener("end",()=>{running=false;});
-  msg.style.display="none";
-  running=true;
-  score=0; timeLeft=60; hp=100; ammo=12; combo=0; reloading=false;
-  scoreEl.textContent=score; timeEl.textContent=timeLeft;
-  hpEl.textContent=hp; ammoEl.textContent=ammo; comboEl.textContent=combo;
-  for(let i=0;i<4;i++) makeTarget();
-  clock.start();
+ reticle3D=new THREE.Mesh(
+   new THREE.RingGeometry(.12,.17,32),
+   new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide})
+ );
+ reticle3D.rotation.x=-Math.PI/2;
+ reticle3D.matrixAutoUpdate=false;
+ reticle3D.visible=false;
+ scene.add(reticle3D);
 
-  const timer=setInterval(()=>{
-    if(!running){clearInterval(timer);return;}
-    timeLeft--;
-    timeEl.textContent=timeLeft;
-    if(timeLeft<=0){
-      running=false;
-      msg.style.display="flex";
-      msg.querySelector("h1").textContent="TIME UP!";
-      msg.querySelector("p").innerHTML=`スコア：<b>${score}</b>`;
-      start.textContent="もう一度プレイ";
-      start.onclick=()=>location.reload();
-      xrSession.end();
-      clearInterval(timer);
-    }
-  },1000);
+ session.addEventListener("select",placeTarget);
 
-  renderer.setAnimationLoop((t)=>{
-    const dt=clock.getDelta();
-    targets.forEach((target)=>{
-      target.rotation.y += dt*1.5;
-      target.position.y += Math.sin(t*0.002+target.userData.phase)*dt*.15;
-      target.userData.life += dt;
-    });
-    for(let i=targets.length-1;i>=0;i--){
-      const target=targets[i];
-      if(target.userData.life>12){
-        hp=Math.max(0,hp-10); hpEl.textContent=hp;
-        combo=0; comboEl.textContent=combo;
-        removeTarget(target); makeTarget();
-        if(hp<=0){
-          running=false;
-          msg.style.display="flex";
-          msg.querySelector("h1").textContent="GAME OVER";
-          msg.querySelector("p").innerHTML=`スコア：<b>${score}</b>`;
-          start.textContent="もう一度プレイ";
-          start.onclick=()=>location.reload();
-          if(xrSession) xrSession.end();
-          break;
-        }
-      }
-    }
-    renderer.render(scene,camera);
-  });
+ const timer=setInterval(()=>{
+   if(!running){clearInterval(timer);return}
+   timeLeft--;timeEl.textContent=timeLeft;
+   if(timeLeft<=0){
+     running=false;clearInterval(timer);status.style.display="none";menu.style.display="flex";
+     $("message").innerHTML=`ゲーム終了！<br>スコア：<b>${score}</b>`;
+     $("start").textContent="もう一度プレイ";
+     $("start").onclick=()=>location.reload();
+     session.end();
+   }
+ },1000);
+
+ renderer.setAnimationLoop((t,frame)=>{
+   if(frame){
+     if(!hitSourceRequested){
+       session.requestReferenceSpace("viewer").then(space=>
+         session.requestHitTestSource({space}).then(src=>{
+           hitSource=src;hitSourceRequested=true;
+         })
+       );
+     }
+     if(hitSource&&reticle3D){
+       const ref=renderer.xr.getReferenceSpace();
+       const results=frame.getHitTestResults(hitSource);
+       if(results.length){
+         const pose=results[0].getPose(ref);
+         reticle3D.visible=true;
+         reticle3D.matrix.fromArray(pose.transform.matrix);
+         place.style.display="block";
+         status.textContent="白い円の場所をタップして敵を配置";
+       }else{
+         reticle3D.visible=false;
+         place.style.display="none";
+         status.textContent="カメラを床・地面に向けてゆっくり動かしてください";
+       }
+     }
+   }
+
+   const dt=clock.getDelta();
+   for(const t of targets){
+     t.rotation.y+=dt*1.5;
+     t.position.y+=Math.sin(t*.001+t.userData.phase)*dt*.05;
+     t.userData.life+=dt;
+   }
+   renderer.render(scene,camera);
+ });
 }
 
-start.addEventListener("click",startAR);
-shoot.addEventListener("pointerdown",shootTarget);
-reloadBtn.addEventListener("pointerdown",reload);
-document.addEventListener("keydown",e=>{
-  if(e.code==="Space")shootTarget();
-  if(e.code==="KeyR")reload();
-});
+$("start").onclick=startAR;
+shoot.onpointerdown=shootTarget;
+reload.onpointerdown=doReload;
+place.onpointerdown=placeTarget;
+addEventListener("keydown",e=>{if(e.code==="Space")shootTarget();if(e.code==="KeyR")doReload()});
 </script>
 </body>
 </html>
